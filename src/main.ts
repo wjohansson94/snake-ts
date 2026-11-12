@@ -2,8 +2,36 @@ import './style.css'
 
 const GRID_SIZE = 20
 const CELL_SIZE = 20
+const TICK_MS = 150
 
 type Point = { x: number; y: number }
+
+type Direction = 'up' | 'down' | 'left' | 'right'
+
+const DIRECTION_VECTORS: Record<Direction, Point> = {
+  up: { x: 0, y: -1 },
+  down: { x: 0, y: 1 },
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
+}
+
+const KEY_TO_DIRECTION: Record<string, Direction | undefined> = {
+  ArrowUp: 'up',
+  KeyW: 'up',
+  ArrowDown: 'down',
+  KeyS: 'down',
+  ArrowLeft: 'left',
+  KeyA: 'left',
+  ArrowRight: 'right',
+  KeyD: 'right',
+}
+
+const OPPOSITE: Record<Direction, Direction> = {
+  up: 'down',
+  down: 'up',
+  left: 'right',
+  right: 'left',
+}
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')
 
@@ -46,6 +74,38 @@ const snake: Point[] = [
   { x: 8, y: 10 },
 ]
 
-drawBoard(context)
+let direction: Direction = 'right'
+let nextDirection: Direction = 'right'
 
-drawSnake(context, snake)
+function moveSnake(): void {
+  direction = nextDirection
+  const vector = DIRECTION_VECTORS[direction]
+  const head = snake[0]
+  snake.unshift({ x: head.x + vector.x, y: head.y + vector.y })
+  snake.pop()
+}
+
+function render(ctx: CanvasRenderingContext2D): void {
+  drawBoard(ctx)
+  drawSnake(ctx, snake)
+}
+
+function tick(ctx: CanvasRenderingContext2D): void {
+  moveSnake()
+  render(ctx)
+}
+
+render(context)
+setInterval(() => tick(context), TICK_MS)
+
+window.addEventListener('keydown', (event) => {
+  const requested = KEY_TO_DIRECTION[event.code]
+  if (!requested) {
+    return
+  }
+  event.preventDefault()
+  // Compare with the last move made, not the pending one
+  if (requested !== OPPOSITE[direction]) {
+    nextDirection = requested
+  }
+})
