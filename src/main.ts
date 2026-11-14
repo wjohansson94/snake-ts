@@ -74,19 +74,56 @@ const snake: Point[] = [
   { x: 8, y: 10 },
 ]
 
+function samePoint(a: Point, b: Point): boolean {
+  return a.x === b.x && a.y === b.y
+}
+
+function randomFreeCell(): Point {
+  const freeCells: Point[] = []
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      const cell = { x, y }
+      if (!snake.some((segment) => samePoint(segment, cell))) {
+        freeCells.push(cell)
+      }
+    }
+  }
+  return freeCells[Math.floor(Math.random() * freeCells.length)]
+}
+
 let direction: Direction = 'right'
 let nextDirection: Direction = 'right'
+let food = randomFreeCell()
+let score = 0
+
+function showScore(): void {
+  const scoreElement = document.querySelector('#score')
+  if (!scoreElement) {
+    throw new Error('Score element #score not found')
+  }
+  scoreElement.textContent = String(score)
+}
 
 function moveSnake(): void {
   direction = nextDirection
   const vector = DIRECTION_VECTORS[direction]
   const head = snake[0]
-  snake.unshift({ x: head.x + vector.x, y: head.y + vector.y })
-  snake.pop()
+  const newHead = { x: head.x + vector.x, y: head.y + vector.y }
+  const ate = samePoint(newHead, food)
+
+  snake.unshift(newHead)
+  if (ate) {
+    score++
+    showScore()
+    food = randomFreeCell()
+  } else {
+    snake.pop()
+  }
 }
 
 function render(ctx: CanvasRenderingContext2D): void {
   drawBoard(ctx)
+  drawCell(ctx, food, '#f85149')
   drawSnake(ctx, snake)
 }
 

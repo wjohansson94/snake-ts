@@ -16,6 +16,11 @@ h1 {
   margin: 0;
 }
 
+.score {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
 canvas {
   background: #0b0c10;
   border: 2px solid #3b3f4a;
