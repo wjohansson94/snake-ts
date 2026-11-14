@@ -68,14 +68,36 @@ function drawSnake(ctx: CanvasRenderingContext2D, segments: Point[]): void {
   })
 }
 
-const snake: Point[] = [
-  { x: 10, y: 10 },
-  { x: 9, y: 10 },
-  { x: 8, y: 10 },
-]
+function drawGameOver(ctx: CanvasRenderingContext2D): void {
+  const width = ctx.canvas.width
+  const height = ctx.canvas.height
+  ctx.fillStyle = 'rgba(11, 12, 16, 0.75)'
+  ctx.fillRect(0, 0, width, height)
+  ctx.fillStyle = '#f3f4f6'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.font = 'bold 32px system-ui, sans-serif'
+  ctx.fillText('Game over', width / 2, height / 2 - 14)
+  ctx.font = '16px system-ui, sans-serif'
+  ctx.fillText('Press Enter or Space to restart', width / 2, height / 2 + 22)
+}
+
+function createSnake(): Point[] {
+  return [
+    { x: 10, y: 10 },
+    { x: 9, y: 10 },
+    { x: 8, y: 10 },
+  ]
+}
+
+let snake = createSnake()
 
 function samePoint(a: Point, b: Point): boolean {
   return a.x === b.x && a.y === b.y
+}
+
+function isOutsideBoard(cell: Point): boolean {
+  return cell.x < 0 || cell.x >= GRID_SIZE || cell.y < 0 || cell.y >= GRID_SIZE
 }
 
 function randomFreeCell(): Point {
@@ -95,6 +117,7 @@ let direction: Direction = 'right'
 let nextDirection: Direction = 'right'
 let food = randomFreeCell()
 let score = 0
+let gameOver = false
 
 function showScore(): void {
   const scoreElement = document.querySelector('#score')
@@ -110,6 +133,14 @@ function moveSnake(): void {
   const head = snake[0]
   const newHead = { x: head.x + vector.x, y: head.y + vector.y }
   const ate = samePoint(newHead, food)
+  // The tail moves away this tick unless the snake grows
+  const body = ate ? snake : snake.slice(0, -1)
+  const hitsSelf = body.some((segment) => samePoint(segment, newHead))
+
+  if (isOutsideBoard(newHead) || hitsSelf) {
+    gameOver = true
+    return
+  }
 
   snake.unshift(newHead)
   if (ate) {
@@ -125,9 +156,25 @@ function render(ctx: CanvasRenderingContext2D): void {
   drawBoard(ctx)
   drawCell(ctx, food, '#f85149')
   drawSnake(ctx, snake)
+  if (gameOver) {
+    drawGameOver(ctx)
+  }
+}
+
+function restart(): void {
+  snake = createSnake()
+  direction = 'right'
+  nextDirection = 'right'
+  food = randomFreeCell()
+  score = 0
+  gameOver = false
+  showScore()
 }
 
 function tick(ctx: CanvasRenderingContext2D): void {
+  if (gameOver) {
+    return
+  }
   moveSnake()
   render(ctx)
 }
@@ -136,6 +183,13 @@ render(context)
 setInterval(() => tick(context), TICK_MS)
 
 window.addEventListener('keydown', (event) => {
+  if (gameOver && (event.code === 'Enter' || event.code === 'Space')) {
+    event.preventDefault()
+    restart()
+    render(context)
+    return
+  }
+
   const requested = KEY_TO_DIRECTION[event.code]
   if (!requested) {
     return
