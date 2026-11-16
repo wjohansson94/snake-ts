@@ -1,12 +1,9 @@
 import './style.css'
+import { GRID_SIZE, isOutsideBoard, samePoint } from './game'
+import type { Direction, Point } from './game'
 
-const GRID_SIZE = 20
 const CELL_SIZE = 20
 const TICK_MS = 150
-
-type Point = { x: number; y: number }
-
-type Direction = 'up' | 'down' | 'left' | 'right'
 
 const DIRECTION_VECTORS: Record<Direction, Point> = {
   up: { x: 0, y: -1 },
@@ -91,14 +88,6 @@ function createSnake(): Point[] {
 }
 
 let snake = createSnake()
-
-function samePoint(a: Point, b: Point): boolean {
-  return a.x === b.x && a.y === b.y
-}
-
-function isOutsideBoard(cell: Point): boolean {
-  return cell.x < 0 || cell.x >= GRID_SIZE || cell.y < 0 || cell.y >= GRID_SIZE
-}
 
 function randomFreeCell(): Point {
   const freeCells: Point[] = []
