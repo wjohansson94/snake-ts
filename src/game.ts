@@ -4,10 +4,99 @@ export type Point = { x: number; y: number }
 
 export type Direction = 'up' | 'down' | 'left' | 'right'
 
+export type GameState = {
+  snake: Point[]
+  direction: Direction
+  nextDirection: Direction
+  food: Point
+  score: number
+  status: 'playing' | 'gameOver'
+}
+
 export function samePoint(a: Point, b: Point): boolean {
   return a.x === b.x && a.y === b.y
 }
 
 export function isOutsideBoard(cell: Point): boolean {
   return cell.x < 0 || cell.x >= GRID_SIZE || cell.y < 0 || cell.y >= GRID_SIZE
+}
+
+export function randomFreeCell(snake: Point[], random: () => number): Point {
+  const freeCells: Point[] = []
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      const cell = { x, y }
+      if (!snake.some((segment) => samePoint(segment, cell))) {
+        freeCells.push(cell)
+      }
+    }
+  }
+  return freeCells[Math.floor(random() * freeCells.length)]
+}
+
+export function createInitialState(random: () => number): GameState {
+  const snake = [
+    { x: 10, y: 10 },
+    { x: 9, y: 10 },
+    { x: 8, y: 10 },
+  ]
+  return {
+    snake,
+    direction: 'right',
+    nextDirection: 'right',
+    food: randomFreeCell(snake, random),
+    score: 0,
+    status: 'playing',
+  }
+}
+
+const OPPOSITE: Record<Direction, Direction> = {
+  up: 'down',
+  down: 'up',
+  left: 'right',
+  right: 'left',
+}
+
+export function turn(state: GameState, requested: Direction): GameState {
+  // Compare with the last move made, not the pending one
+  if (requested === OPPOSITE[state.direction]) {
+    return state
+  }
+  return { ...state, nextDirection: requested }
+}
+
+const DIRECTION_VECTORS: Record<Direction, Point> = {
+  up: { x: 0, y: -1 },
+  down: { x: 0, y: 1 },
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
+}
+
+export function step(state: GameState, random: () => number): GameState {
+  if (state.status !== 'playing') {
+    return state
+  }
+
+  const direction = state.nextDirection
+  const vector = DIRECTION_VECTORS[direction]
+  const head = state.snake[0]
+  const newHead = { x: head.x + vector.x, y: head.y + vector.y }
+  const ate = samePoint(newHead, state.food)
+  // The tail moves away this tick unless the snake grows
+  const body = ate ? state.snake : state.snake.slice(0, -1)
+  const hitsSelf = body.some((segment) => samePoint(segment, newHead))
+
+  if (isOutsideBoard(newHead) || hitsSelf) {
+    return { ...state, status: 'gameOver' }
+  }
+
+  const snake = [newHead, ...body]
+
+  return {
+    ...state,
+    snake,
+    direction,
+    score: ate ? state.score + 1 : state.score,
+    food: ate ? randomFreeCell(snake, random) : state.food,
+  }
 }
