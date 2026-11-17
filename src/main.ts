@@ -1,16 +1,9 @@
 import './style.css'
-import { GRID_SIZE, isOutsideBoard, samePoint } from './game'
+import { createInitialState, GRID_SIZE, step, turn } from './game'
 import type { Direction, Point } from './game'
 
 const CELL_SIZE = 20
 const TICK_MS = 150
-
-const DIRECTION_VECTORS: Record<Direction, Point> = {
-  up: { x: 0, y: -1 },
-  down: { x: 0, y: 1 },
-  left: { x: -1, y: 0 },
-  right: { x: 1, y: 0 },
-}
 
 const KEY_TO_DIRECTION: Record<string, Direction | undefined> = {
   ArrowUp: 'up',
@@ -21,13 +14,6 @@ const KEY_TO_DIRECTION: Record<string, Direction | undefined> = {
   KeyA: 'left',
   ArrowRight: 'right',
   KeyD: 'right',
-}
-
-const OPPOSITE: Record<Direction, Direction> = {
-  up: 'down',
-  down: 'up',
-  left: 'right',
-  right: 'left',
 }
 
 const canvas = document.querySelector<HTMLCanvasElement>('#game')
@@ -79,92 +65,32 @@ function drawGameOver(ctx: CanvasRenderingContext2D): void {
   ctx.fillText('Press Enter or Space to restart', width / 2, height / 2 + 22)
 }
 
-function createSnake(): Point[] {
-  return [
-    { x: 10, y: 10 },
-    { x: 9, y: 10 },
-    { x: 8, y: 10 },
-  ]
-}
-
-let snake = createSnake()
-
-function randomFreeCell(): Point {
-  const freeCells: Point[] = []
-  for (let y = 0; y < GRID_SIZE; y++) {
-    for (let x = 0; x < GRID_SIZE; x++) {
-      const cell = { x, y }
-      if (!snake.some((segment) => samePoint(segment, cell))) {
-        freeCells.push(cell)
-      }
-    }
-  }
-  return freeCells[Math.floor(Math.random() * freeCells.length)]
-}
-
-let direction: Direction = 'right'
-let nextDirection: Direction = 'right'
-let food = randomFreeCell()
-let score = 0
-let gameOver = false
+let state = createInitialState(Math.random)
 
 function showScore(): void {
   const scoreElement = document.querySelector('#score')
   if (!scoreElement) {
     throw new Error('Score element #score not found')
   }
-  scoreElement.textContent = String(score)
-}
-
-function moveSnake(): void {
-  direction = nextDirection
-  const vector = DIRECTION_VECTORS[direction]
-  const head = snake[0]
-  const newHead = { x: head.x + vector.x, y: head.y + vector.y }
-  const ate = samePoint(newHead, food)
-  // The tail moves away this tick unless the snake grows
-  const body = ate ? snake : snake.slice(0, -1)
-  const hitsSelf = body.some((segment) => samePoint(segment, newHead))
-
-  if (isOutsideBoard(newHead) || hitsSelf) {
-    gameOver = true
-    return
-  }
-
-  snake.unshift(newHead)
-  if (ate) {
-    score++
-    showScore()
-    food = randomFreeCell()
-  } else {
-    snake.pop()
-  }
+  scoreElement.textContent = String(state.score)
 }
 
 function render(ctx: CanvasRenderingContext2D): void {
   drawBoard(ctx)
-  drawCell(ctx, food, '#f85149')
-  drawSnake(ctx, snake)
-  if (gameOver) {
+  drawCell(ctx, state.food, '#f85149')
+  drawSnake(ctx, state.snake)
+  showScore()
+  if (state.status === 'gameOver') {
     drawGameOver(ctx)
   }
 }
 
 function restart(): void {
-  snake = createSnake()
-  direction = 'right'
-  nextDirection = 'right'
-  food = randomFreeCell()
-  score = 0
-  gameOver = false
-  showScore()
+  state = createInitialState(Math.random)
 }
 
 function tick(ctx: CanvasRenderingContext2D): void {
-  if (gameOver) {
-    return
-  }
-  moveSnake()
+  state = step(state, Math.random)
   render(ctx)
 }
 
@@ -172,7 +98,7 @@ render(context)
 setInterval(() => tick(context), TICK_MS)
 
 window.addEventListener('keydown', (event) => {
-  if (gameOver && (event.code === 'Enter' || event.code === 'Space')) {
+  if (state.status === 'gameOver' && (event.code === 'Enter' || event.code === 'Space')) {
     event.preventDefault()
     restart()
     render(context)
@@ -184,8 +110,5 @@ window.addEventListener('keydown', (event) => {
     return
   }
   event.preventDefault()
-  // Compare with the last move made, not the pending one
-  if (requested !== OPPOSITE[direction]) {
-    nextDirection = requested
-  }
+  state = turn(state, requested)
 })
