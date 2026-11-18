@@ -8,9 +8,9 @@ export type GameState = {
   snake: Point[]
   direction: Direction
   nextDirection: Direction
-  food: Point
+  food: Point | null
   score: number
-  status: 'playing' | 'gameOver'
+  status: 'playing' | 'gameOver' | 'won'
 }
 
 export function samePoint(a: Point, b: Point): boolean {
@@ -21,7 +21,7 @@ export function isOutsideBoard(cell: Point): boolean {
   return cell.x < 0 || cell.x >= GRID_SIZE || cell.y < 0 || cell.y >= GRID_SIZE
 }
 
-export function randomFreeCell(snake: Point[], random: () => number): Point {
+export function randomFreeCell(snake: Point[], random: () => number): Point | null {
   const freeCells: Point[] = []
   for (let y = 0; y < GRID_SIZE; y++) {
     for (let x = 0; x < GRID_SIZE; x++) {
@@ -30,6 +30,9 @@ export function randomFreeCell(snake: Point[], random: () => number): Point {
         freeCells.push(cell)
       }
     }
+  }
+  if (freeCells.length === 0) {
+    return null
   }
   return freeCells[Math.floor(random() * freeCells.length)]
 }
@@ -81,7 +84,7 @@ export function step(state: GameState, random: () => number): GameState {
   const vector = DIRECTION_VECTORS[direction]
   const head = state.snake[0]
   const newHead = { x: head.x + vector.x, y: head.y + vector.y }
-  const ate = samePoint(newHead, state.food)
+  const ate = state.food !== null && samePoint(newHead, state.food)
   // The tail moves away this tick unless the snake grows
   const body = ate ? state.snake : state.snake.slice(0, -1)
   const hitsSelf = body.some((segment) => samePoint(segment, newHead))
@@ -91,12 +94,14 @@ export function step(state: GameState, random: () => number): GameState {
   }
 
   const snake = [newHead, ...body]
+  const food = ate ? randomFreeCell(snake, random) : state.food
 
   return {
     ...state,
     snake,
     direction,
     score: ate ? state.score + 1 : state.score,
-    food: ate ? randomFreeCell(snake, random) : state.food,
+    food,
+    status: food === null ? 'won' : 'playing',
   }
 }
