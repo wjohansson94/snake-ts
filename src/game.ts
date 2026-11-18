@@ -8,9 +8,10 @@ export type GameState = {
   snake: Point[]
   direction: Direction
   nextDirection: Direction
+  queuedDirection: Direction | null
   food: Point | null
   score: number
-  status: 'playing' | 'gameOver' | 'won'
+  status: 'playing' | 'paused' | 'gameOver' | 'won'
 }
 
 export function samePoint(a: Point, b: Point): boolean {
@@ -47,6 +48,7 @@ export function createInitialState(random: () => number): GameState {
     snake,
     direction: 'right',
     nextDirection: 'right',
+    queuedDirection: null,
     food: randomFreeCell(snake, random),
     score: 0,
     status: 'playing',
@@ -61,11 +63,19 @@ const OPPOSITE: Record<Direction, Direction> = {
 }
 
 export function turn(state: GameState, requested: Direction): GameState {
-  // Compare with the last move made, not the pending one
-  if (requested === OPPOSITE[state.direction]) {
+  if (state.nextDirection === state.direction) {
+    // Nothing pending: compare with the last move made
+    if (requested === OPPOSITE[state.direction]) {
+      return state
+    }
+    return { ...state, nextDirection: requested }
+  }
+  // One turn is pending: remember a second one so fast key presses are not lost
+  const pending = state.nextDirection
+  if (state.queuedDirection !== null || requested === pending || requested === OPPOSITE[pending]) {
     return state
   }
-  return { ...state, nextDirection: requested }
+  return { ...state, queuedDirection: requested }
 }
 
 const DIRECTION_VECTORS: Record<Direction, Point> = {
@@ -100,8 +110,20 @@ export function step(state: GameState, random: () => number): GameState {
     ...state,
     snake,
     direction,
+    nextDirection: state.queuedDirection ?? direction,
+    queuedDirection: null,
     score: ate ? state.score + 1 : state.score,
     food,
     status: food === null ? 'won' : 'playing',
   }
+}
+
+export function togglePause(state: GameState): GameState {
+  if (state.status === 'playing') {
+    return { ...state, status: 'paused' }
+  }
+  if (state.status === 'paused') {
+    return { ...state, status: 'playing' }
+  }
+  return state
 }

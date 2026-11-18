@@ -9,8 +9,14 @@
   <body>
     <main>
       <h1>Snake</h1>
-      <p class="score">Score: <span id="score">0</span></p>
-      <canvas id="game"></canvas>
+      <p class="score" aria-live="polite">Score: <span id="score">0</span></p>
+      <p class="best">Best: <span id="best">0</span></p>
+      <canvas id="game" role="img" aria-label="Snake game board"></canvas>
+      <p id="status" class="visually-hidden" role="status"></p>
+      <p class="instructions">
+        Steer with the arrow keys or WASD. Press P or Esc to pause, Enter or Space to restart.
+        On a touch screen, swipe on the board to steer and tap it to pause or restart.
+      </p>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

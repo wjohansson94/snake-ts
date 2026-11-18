@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createInitialState, GRID_SIZE, isOutsideBoard, randomFreeCell, samePoint, step, turn } from './game'
+import { createInitialState, GRID_SIZE, isOutsideBoard, randomFreeCell, samePoint, step, togglePause, turn } from './game'
 import type { GameState, Point } from './game'
 
 function allCells(): Point[] {
@@ -21,6 +21,7 @@ function makeState(overrides: Partial<GameState> = {}): GameState {
     ],
     direction: 'right',
     nextDirection: 'right',
+    queuedDirection: null,
     food: { x: 0, y: 0 },
     score: 0,
     status: 'playing',
@@ -117,9 +118,22 @@ describe('turn', () => {
     expect(turn(state, 'left')).toEqual(state)
   })
 
-  it('compares with the last move made, not the pending turn', () => {
+  it('queues a second turn behind a pending one', () => {
     const state = makeState({ direction: 'right', nextDirection: 'up' })
-    expect(turn(state, 'left').nextDirection).toBe('up')
+    const next = turn(state, 'left')
+    expect(next.nextDirection).toBe('up')
+    expect(next.queuedDirection).toBe('left')
+  })
+
+  it('ignores a queued turn that reverses or repeats the pending one', () => {
+    const state = makeState({ direction: 'right', nextDirection: 'up' })
+    expect(turn(state, 'down')).toBe(state)
+    expect(turn(state, 'up')).toBe(state)
+  })
+
+  it('keeps only one queued turn', () => {
+    const state = makeState({ direction: 'right', nextDirection: 'up', queuedDirection: 'left' })
+    expect(turn(state, 'right')).toBe(state)
   })
 })
 
@@ -182,6 +196,15 @@ describe('step', () => {
     expect(step(state, () => 0).status).toBe('playing')
   })
 
+  it('moves on to the queued turn on the next step', () => {
+    const state = makeState({ direction: 'right', nextDirection: 'up', queuedDirection: 'left' })
+    const first = step(state, () => 0)
+    expect(first.direction).toBe('up')
+    expect(first.nextDirection).toBe('left')
+    expect(first.queuedDirection).toBeNull()
+    expect(step(first, () => 0).direction).toBe('left')
+  })
+
   it('does nothing once the game is over', () => {
     const state = makeState({ status: 'gameOver' })
     expect(step(state, () => 0)).toEqual(state)
@@ -195,5 +218,27 @@ describe('step', () => {
     expect(next.food).toBeNull()
     expect(next.snake).toHaveLength(GRID_SIZE * GRID_SIZE)
     expect(next.score).toBe(1)
+  })
+})
+
+describe('togglePause', () => {
+  it('pauses a running game', () => {
+    expect(togglePause(makeState()).status).toBe('paused')
+  })
+
+  it('resumes a paused game', () => {
+    expect(togglePause(makeState({ status: 'paused' })).status).toBe('playing')
+  })
+
+  it('leaves a finished game alone', () => {
+    const gameOver = makeState({ status: 'gameOver' })
+    const won = makeState({ status: 'won' })
+    expect(togglePause(gameOver)).toBe(gameOver)
+    expect(togglePause(won)).toBe(won)
+  })
+
+  it('freezes the snake while paused', () => {
+    const paused = makeState({ status: 'paused' })
+    expect(step(paused, () => 0)).toBe(paused)
   })
 })
