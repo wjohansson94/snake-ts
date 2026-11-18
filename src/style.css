@@ -21,7 +21,34 @@ h1 {
   font-size: 1.25rem;
 }
 
+.best,
+.instructions {
+  margin: 0;
+  color: #b4b8c2;
+}
+
+.instructions {
+  max-width: 25rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 canvas {
+  box-sizing: border-box;
+  width: min(100%, 25rem);
+  height: auto;
+  aspect-ratio: 1;
+  touch-action: none;
   background: #0b0c10;
   border: 2px solid #3b3f4a;
 }

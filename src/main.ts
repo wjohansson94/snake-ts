@@ -1,9 +1,12 @@
 import './style.css'
-import { createInitialState, GRID_SIZE, step, turn } from './game'
+import { createInitialState, GRID_SIZE, step, togglePause, turn } from './game'
 import type { Direction, Point } from './game'
+import { loadHighScore, saveHighScore } from './high-score'
 
 const CELL_SIZE = 20
 const TICK_MS = 150
+// A touch must travel this many pixels before it counts as a swipe
+const SWIPE_DISTANCE = 24
 
 const KEY_TO_DIRECTION: Record<string, Direction | undefined> = {
   ArrowUp: 'up',
@@ -16,12 +19,24 @@ const KEY_TO_DIRECTION: Record<string, Direction | undefined> = {
   KeyD: 'right',
 }
 
-const canvas = document.querySelector<HTMLCanvasElement>('#game')
-
-if (!canvas) {
-  throw new Error('Canvas element #game not found')
+const OVERLAYS = {
+  paused: { title: 'Paused', hint: 'Press P or Escape to resume' },
+  gameOver: { title: 'Game over', hint: 'Press Enter or Space to restart' },
+  won: { title: 'You win!', hint: 'Press Enter or Space to restart' },
 }
 
+function getElement<T extends Element>(selector: string): T {
+  const element = document.querySelector<T>(selector)
+  if (!element) {
+    throw new Error(`Element ${selector} not found`)
+  }
+  return element
+}
+
+const canvas = getElement<HTMLCanvasElement>('#game')
+const scoreElement = getElement('#score')
+const bestElement = getElement('#best')
+const statusElement = getElement('#status')
 canvas.width = GRID_SIZE * CELL_SIZE
 canvas.height = GRID_SIZE * CELL_SIZE
 
@@ -51,7 +66,7 @@ function drawSnake(ctx: CanvasRenderingContext2D, segments: Point[]): void {
   })
 }
 
-function drawEndScreen(ctx: CanvasRenderingContext2D, title: string): void {
+function drawOverlay(ctx: CanvasRenderingContext2D, title: string, hint: string): void {
   const width = ctx.canvas.width
   const height = ctx.canvas.height
   ctx.fillStyle = 'rgba(11, 12, 16, 0.75)'
@@ -62,17 +77,26 @@ function drawEndScreen(ctx: CanvasRenderingContext2D, title: string): void {
   ctx.font = 'bold 32px system-ui, sans-serif'
   ctx.fillText(title, width / 2, height / 2 - 14)
   ctx.font = '16px system-ui, sans-serif'
-  ctx.fillText('Press Enter or Space to restart', width / 2, height / 2 + 22)
+  ctx.fillText(hint, width / 2, height / 2 + 22)
 }
 
 let state = createInitialState(Math.random)
+let bestScore = loadHighScore()
+
+// Only touch the DOM when the text changes, so screen readers are not interrupted every tick
+function setText(element: Element, text: string): void {
+  if (element.textContent !== text) {
+    element.textContent = text
+  }
+}
 
 function showScore(): void {
-  const scoreElement = document.querySelector('#score')
-  if (!scoreElement) {
-    throw new Error('Score element #score not found')
+  if (state.score > bestScore) {
+    bestScore = state.score
+    saveHighScore(bestScore)
   }
-  scoreElement.textContent = String(state.score)
+  setText(scoreElement, String(state.score))
+  setText(bestElement, String(bestScore))
 }
 
 function render(ctx: CanvasRenderingContext2D): void {
@@ -82,13 +106,30 @@ function render(ctx: CanvasRenderingContext2D): void {
   }
   drawSnake(ctx, state.snake)
   showScore()
-  if (state.status !== 'playing') {
-    drawEndScreen(ctx, state.status === 'won' ? 'You win!' : 'Game over')
+  if (state.status === 'playing') {
+    setText(statusElement, '')
+  } else {
+    const overlay = OVERLAYS[state.status]
+    drawOverlay(ctx, overlay.title, overlay.hint)
+    setText(statusElement, `${overlay.title}. Score ${state.score}.`)
   }
 }
 
 function restart(): void {
   state = createInitialState(Math.random)
+}
+
+function isFinished(): boolean {
+  return state.status === 'gameOver' || state.status === 'won'
+}
+
+function toggleOrRestart(ctx: CanvasRenderingContext2D): void {
+  if (isFinished()) {
+    restart()
+  } else {
+    state = togglePause(state)
+  }
+  render(ctx)
 }
 
 function tick(ctx: CanvasRenderingContext2D): void {
@@ -100,7 +141,21 @@ render(context)
 setInterval(() => tick(context), TICK_MS)
 
 window.addEventListener('keydown', (event) => {
-  if (state.status !== 'playing' && (event.code === 'Enter' || event.code === 'Space')) {
+  // Leave browser shortcuts like Ctrl+R or Ctrl+S alone
+  if (event.ctrlKey || event.altKey || event.metaKey) {
+    return
+  }
+
+  if ((event.code === 'KeyP' || event.code === 'Escape') && !event.repeat) {
+    event.preventDefault()
+    if (!isFinished()) {
+      state = togglePause(state)
+      render(context)
+    }
+    return
+  }
+
+  if (isFinished() && ['Enter', 'NumpadEnter', 'Space'].includes(event.code)) {
     event.preventDefault()
     restart()
     render(context)
@@ -111,6 +166,53 @@ window.addEventListener('keydown', (event) => {
   if (!requested) {
     return
   }
+  // preventDefault stops the arrow keys from scrolling the page
   event.preventDefault()
   state = turn(state, requested)
+})
+
+// A hidden tab has no one watching, so pause instead of letting the snake crash
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && state.status === 'playing') {
+    state = togglePause(state)
+    render(context)
+  }
+})
+
+let touchStart: Point | null = null
+let swiped = false
+
+canvas.addEventListener('pointerdown', (event) => {
+  // Keep receiving events even if the finger or mouse leaves the board
+  canvas.setPointerCapture(event.pointerId)
+  touchStart = { x: event.clientX, y: event.clientY }
+  swiped = false
+})
+
+canvas.addEventListener('pointermove', (event) => {
+  if (!touchStart) {
+    return
+  }
+  const dx = event.clientX - touchStart.x
+  const dy = event.clientY - touchStart.y
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < SWIPE_DISTANCE) {
+    return
+  }
+  const horizontal = Math.abs(dx) > Math.abs(dy)
+  const requested: Direction = horizontal ? (dx > 0 ? 'right' : 'left') : dy > 0 ? 'down' : 'up'
+  state = turn(state, requested)
+  // Start measuring again so one long swipe can chain several turns
+  touchStart = { x: event.clientX, y: event.clientY }
+  swiped = true
+})
+
+canvas.addEventListener('pointerup', () => {
+  if (touchStart && !swiped) {
+    toggleOrRestart(context)
+  }
+  touchStart = null
+})
+
+canvas.addEventListener('pointercancel', () => {
+  touchStart = null
 })
