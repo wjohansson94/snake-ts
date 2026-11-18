@@ -51,7 +51,7 @@ function drawSnake(ctx: CanvasRenderingContext2D, segments: Point[]): void {
   })
 }
 
-function drawGameOver(ctx: CanvasRenderingContext2D): void {
+function drawEndScreen(ctx: CanvasRenderingContext2D, title: string): void {
   const width = ctx.canvas.width
   const height = ctx.canvas.height
   ctx.fillStyle = 'rgba(11, 12, 16, 0.75)'
@@ -60,7 +60,7 @@ function drawGameOver(ctx: CanvasRenderingContext2D): void {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.font = 'bold 32px system-ui, sans-serif'
-  ctx.fillText('Game over', width / 2, height / 2 - 14)
+  ctx.fillText(title, width / 2, height / 2 - 14)
   ctx.font = '16px system-ui, sans-serif'
   ctx.fillText('Press Enter or Space to restart', width / 2, height / 2 + 22)
 }
@@ -77,11 +77,13 @@ function showScore(): void {
 
 function render(ctx: CanvasRenderingContext2D): void {
   drawBoard(ctx)
-  drawCell(ctx, state.food, '#f85149')
+  if (state.food) {
+    drawCell(ctx, state.food, '#f85149')
+  }
   drawSnake(ctx, state.snake)
   showScore()
-  if (state.status === 'gameOver') {
-    drawGameOver(ctx)
+  if (state.status !== 'playing') {
+    drawEndScreen(ctx, state.status === 'won' ? 'You win!' : 'Game over')
   }
 }
 
@@ -98,7 +100,7 @@ render(context)
 setInterval(() => tick(context), TICK_MS)
 
 window.addEventListener('keydown', (event) => {
-  if (state.status === 'gameOver' && (event.code === 'Enter' || event.code === 'Space')) {
+  if (state.status !== 'playing' && (event.code === 'Enter' || event.code === 'Space')) {
     event.preventDefault()
     restart()
     render(context)

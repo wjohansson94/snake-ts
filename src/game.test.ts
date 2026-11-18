@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { createInitialState, GRID_SIZE, isOutsideBoard, randomFreeCell, samePoint, step, turn } from './game'
-import type { GameState } from './game'
+import type { GameState, Point } from './game'
+
+function allCells(): Point[] {
+  const cells: Point[] = []
+  for (let y = 0; y < GRID_SIZE; y++) {
+    for (let x = 0; x < GRID_SIZE; x++) {
+      cells.push({ x, y })
+    }
+  }
+  return cells
+}
 
 function makeState(overrides: Partial<GameState> = {}): GameState {
   return {
@@ -63,8 +73,13 @@ describe('randomFreeCell', () => {
   it('never picks a cell the snake occupies', () => {
     for (let i = 0; i < 100; i++) {
       const cell = randomFreeCell(snake, () => i / 100)
-      expect(snake.some((segment) => samePoint(segment, cell))).toBe(false)
+      expect(cell).not.toBeNull()
+      expect(snake).not.toContainEqual(cell)
     }
+  })
+
+  it('returns null when the snake fills the whole board', () => {
+    expect(randomFreeCell(allCells(), () => 0)).toBeNull()
   })
 })
 
@@ -170,5 +185,15 @@ describe('step', () => {
   it('does nothing once the game is over', () => {
     const state = makeState({ status: 'gameOver' })
     expect(step(state, () => 0)).toEqual(state)
+  })
+
+  it('wins when it eats the last free cell', () => {
+    const snake = allCells().slice(0, -1).reverse()
+    const state = makeState({ snake, food: { x: GRID_SIZE - 1, y: GRID_SIZE - 1 } })
+    const next = step(state, () => 0)
+    expect(next.status).toBe('won')
+    expect(next.food).toBeNull()
+    expect(next.snake).toHaveLength(GRID_SIZE * GRID_SIZE)
+    expect(next.score).toBe(1)
   })
 })
