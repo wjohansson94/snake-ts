@@ -4,7 +4,9 @@ import type { Direction, Point } from './game'
 import { loadHighScore, saveHighScore } from './high-score'
 
 const CELL_SIZE = 20
-const TICK_MS = 150
+type Difficulty = 'easy' | 'normal' | 'hard'
+// Milliseconds per move: a lower number means a faster snake
+const TICK_MS: Record<Difficulty, number> = { easy: 200, normal: 150, hard: 90 }
 // A touch must travel this many pixels before it counts as a swipe
 const SWIPE_DISTANCE = 24
 
@@ -37,6 +39,7 @@ const canvas = getElement<HTMLCanvasElement>('#game')
 const scoreElement = getElement('#score')
 const bestElement = getElement('#best')
 const statusElement = getElement('#status')
+const difficultySelect = getElement<HTMLSelectElement>('#difficulty')
 canvas.width = GRID_SIZE * CELL_SIZE
 canvas.height = GRID_SIZE * CELL_SIZE
 
@@ -138,7 +141,16 @@ function tick(ctx: CanvasRenderingContext2D): void {
 }
 
 render(context)
-setInterval(() => tick(context), TICK_MS)
+let timer = setInterval(() => tick(context), TICK_MS[difficultySelect.value as Difficulty])
+
+difficultySelect.addEventListener('change', () => {
+  clearInterval(timer)
+  timer = setInterval(() => tick(context), TICK_MS[difficultySelect.value as Difficulty])
+  restart()
+  render(context)
+  // Give the focus back to the page so the arrow keys steer the snake, not the list
+  difficultySelect.blur()
+})
 
 window.addEventListener('keydown', (event) => {
   // Leave browser shortcuts like Ctrl+R or Ctrl+S alone

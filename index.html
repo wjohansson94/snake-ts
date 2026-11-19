@@ -11,6 +11,14 @@
       <h1>Snake</h1>
       <p class="score" aria-live="polite">Score: <span id="score">0</span></p>
       <p class="best">Best: <span id="best">0</span></p>
+      <label class="difficulty">
+        Difficulty:
+        <select id="difficulty">
+          <option value="easy">Easy</option>
+          <option value="normal" selected>Normal</option>
+          <option value="hard">Hard</option>
+        </select>
+      </label>
       <canvas id="game" role="img" aria-label="Snake game board"></canvas>
       <p id="status" class="visually-hidden" role="status"></p>
       <p class="instructions">
